@@ -1,0 +1,13 @@
+opencv-python-headless
+ultralytics
+numpy
+gpiozero
+pigpio
+gTTS
+simpleaudio
+sounddevice
+openai
+langdetect
+vosk
+pyttsx3
+mpg123
