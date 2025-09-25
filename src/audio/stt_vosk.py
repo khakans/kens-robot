@@ -1,9 +1,7 @@
 import queue
 import sounddevice as sd
-import vosk
 import json
 from vosk import Model, KaldiRecognizer
-
 
 class VoskSTT:
     def __init__(self, model_path: str, samplerate: int = 16000, device=None):

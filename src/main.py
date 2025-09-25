@@ -7,8 +7,7 @@ import logging
 from queue import Queue, Empty
 
 from vision.camera import Camera
-from vision.detector import FaceDetector
-from vision.room_detector import RoomDetector
+from vision.scene import Scene
 from audio.stt_vosk import VoskSTT
 from audio.tts import TTS
 from llm.llm_client import LLMClient
@@ -54,22 +53,16 @@ def prepare_user_message(user_text, scene_state):
     ]
 
     if any(word in text.lower() for word in scene_keywords):
-        faces = scene_state.get("faces", [])
         objects = scene_state.get("objects", [])
-        scene_desc = describe_scene_natural(faces, objects)
+        scene_desc = describe_scene_natural(objects)
         text += f". Scene: {scene_desc}"
 
     return {"role": "user", "content": text}
 
-def describe_scene_natural(faces, objects):
+def describe_scene_natural(objects):
     desc = []
-    if faces:
-        if len(faces) == 1:
-            desc.append("i see one person in front of me")
-        else:
-            desc.append("i see {} people in front of me".format(len(faces)))
     if objects:
-        obj_list = [o.get("label", "benda") for o in objects]
+        obj_list = [o.get("label", "object") for o in objects]
         desc.append(f"i see {', '.join(obj_list)} in front of me")
     if not desc:
         return "i see nothing in front of me"
@@ -78,7 +71,7 @@ def describe_scene_natural(faces, objects):
 # =====================
 # Vision worker
 # =====================
-def vision_worker(cam, face_detector, room_detector, drive, stop_event, scene_state):
+def vision_worker(cam, scene, drive, stop_event, scene_state):
     while not stop_event.is_set():
         try:
             ret, frame = next(cam.frames(), (False, None))
@@ -86,18 +79,12 @@ def vision_worker(cam, face_detector, room_detector, drive, stop_event, scene_st
                 time.sleep(0.05)
                 continue
 
-            faces = face_detector.detect(frame)
-            frame, objects = room_detector.detect(frame)
-
-            if faces:
-                print("🙂 Face detected:", faces)
-                drive.stop()
+            frame, objects = scene.detect(frame)
 
             if objects:
                 for o in objects:
-                    print(f"📦 {o['label']} (accuracy: {o.get('confidence',0):.2f}) at {o.get('bbox')}")
+                    print(f"📦 {o['label']} (accuracy: {o.get('confidence',0):.2f})")
 
-            scene_state["faces"] = faces
             scene_state["objects"] = objects
 
         except Exception as e:
@@ -114,7 +101,6 @@ def voice_worker(stt, tts_queue, llm, drive, stop_event, scene_state):
         ("stop","berhenti"): lambda lang: (drive.stop(), tts_queue.put(("Berhenti" if lang=="en" else "Stopped", lang)))
     }
 
-    last_scene_send = 0
     while not stop_event.is_set():
         try:
             result = stt.listen_once(timeout=3)  # timeout lebih panjang
@@ -180,8 +166,7 @@ if __name__ == "__main__":
 
     try:
         cam = Camera()
-        detector = FaceDetector()
-        room_detector = RoomDetector()
+        scene = Scene()
 
         if DRIVE_AVAILABLE and not USE_MOCK and platform.system() != "Darwin":
             drive = DifferentialDrive(left_pins=(17,18), right_pins=(22,23))
@@ -196,7 +181,7 @@ if __name__ == "__main__":
 
         vision_thread = threading.Thread(
             target=vision_worker,
-            args=(cam, detector, room_detector, drive, stop_event, scene_state),
+            args=(cam, scene, drive, stop_event, scene_state),
             daemon=True
         )
         voice_thread = threading.Thread(

@@ -2,8 +2,7 @@ from ultralytics import YOLO
 import cv2
 import os
 
-
-class RoomDetector:
+class Scene:
     def __init__(self, model_path="models/yolov8n.pt"):
         if not os.path.exists(model_path) and model_path == "models/yolov8n.pt":
             print("[Warning] Model path not found, using default pretrained YOLO")
