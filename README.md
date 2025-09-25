@@ -81,5 +81,5 @@ pip install -r requirements.txt
 python src/main.py
 
 2. **with script**
-chmod +x run.sh
-./run.sh
+chmod +x start.sh
+./start.sh
